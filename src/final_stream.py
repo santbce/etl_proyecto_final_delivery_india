@@ -1,4 +1,8 @@
-"""Kafka replay and inference. The consumer never queries the analytical database."""
+"""Kafka replay and inference. The consumer never queries the analytical database.
+
+Each event carries one city's pollutant readings for one local day; the consumer
+estimates the AQI of that same day with the serialized model.
+"""
 from __future__ import annotations
 import argparse
 from datetime import date, datetime, timezone, timedelta
@@ -16,10 +20,10 @@ import pandas as pd
 import psycopg
 from confluent_kafka import Consumer, Producer, KafkaException
 from confluent_kafka.admin import AdminClient, NewTopic
-from final_ml import FEATURE_COLUMNS, NUMERIC_FEATURES, CITIES, build_features
+from final_ml import FEATURE_COLUMNS, NUMERIC_FEATURES, CITIES, HORIZON_DAYS, build_features
 
 TOPIC = 'india.aqi.features.v1'
-SCHEMA = 'india.aqi.next-day.v1'
+SCHEMA = 'india.aqi.nowcast.v1'
 
 def now():
     return datetime.now(timezone.utc).isoformat()
@@ -62,9 +66,9 @@ def validate_event(event):
     if ts.tzinfo is None:
         raise ValueError('published_at must include timezone')
     origin, target = date.fromisoformat(event['origin_date']), date.fromisoformat(event['target_date'])
-    if target != origin + timedelta(days=1):
-        raise ValueError('Target must be the following local day')
-    if not date(2015,1,7) <= origin <= date(2024,12,31):
+    if target != origin + timedelta(days=HORIZON_DAYS):
+        raise ValueError('Target date must be the same local day as the pollutant readings')
+    if not date(2015,1,1) <= origin <= date(2024,12,31):
         raise ValueError('Origin date outside the historical contract')
     for k in ['city_id','source_measurement_id']:
         if type(event[k]) is not int or event[k] < 1:
@@ -75,12 +79,8 @@ def validate_event(event):
     for k in NUMERIC_FEATURES:
         if type(f[k]) not in (int,float) or not math.isfinite(f[k]):
             raise ValueError('Non-finite/non-numeric feature: '+k)
-        if k not in ['temperature_lag1'] and f[k] < 0:
-            raise ValueError('Negative feature: '+k)
-    if f['month'] != target.month or f['day_of_week'] != target.weekday():
-        raise ValueError('Calendar features do not match target date')
-    if not -90 <= f['temperature_lag1'] <= 60:
-        raise ValueError('Temperature outside quality contract')
+        if f[k] < 0:
+            raise ValueError('Negative pollutant reading: '+k)
     return event
 
 def open_store(path):

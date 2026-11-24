@@ -10,15 +10,15 @@ flowchart LR
     Q -->|fail| B[Fail validation task<br/>block analytical load]
     Q -->|pass and hash matches| DW[(PostgreSQL india_dw<br/>facts, dimensions, run approval)]
     DW --> R[Python static report<br/>SQL snapshot and interpreted findings]
-    DW --> F[Shared historical feature builder<br/>one-day horizon, past-only inputs]
-    F --> ML[Temporal train / validation / test<br/>Ridge and Random Forest]
+    DW --> F[Shared feature builder<br/>same-day pollutant readings per city]
+    F --> ML[Temporal train / validation / test<br/>Ridge, HistGradientBoosting, Random Forest]
     ML --> M[Saved fitted pipeline<br/>model.joblib and metadata.json]
     F --> P[Python producer<br/>paced historical replay]
     M -->|training task succeeds| P
     P --> K[(Kafka KRaft<br/>india.aqi.features.v1)]
-    K --> C[Separate Python consumer<br/>validate event, infer, persist, commit]
+    K --> C[Separate Python consumer<br/>validate event, estimate AQI, persist, commit]
     M --> C
-    C --> S[(SQLite prediction state<br/>idempotent event IDs and rejections)]
-    S --> V[Streamlit live prediction dashboard<br/>fragment refresh every 2 seconds]
+    C --> S[(SQLite estimate state<br/>idempotent event IDs and rejections)]
+    S --> V[Streamlit live AQI dashboard<br/>estimated AQI and CPCB category]
     ML --> O[Offline test metrics and predictions]
     O --> R

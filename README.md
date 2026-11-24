@@ -2,9 +2,9 @@
 
 Samuel Flores · Santiago Becerra · ETL G51
 
-Repository: [santbce/etl_calidad_aire_india_final_delivery](https://github.com/santbce/etl_calidad_aire_india_final_delivery).
+Repository: [santbce/etl_proyecto_final_delivery_india](https://github.com/santbce/etl_proyecto_final_delivery_india).
 
-This extends the [second delivery](README_PREVIOUS_DELIVERIES.md). It preserves the three sources (Kaggle air-quality measurements, Wikipedia city coordinates, Open-Meteo ERA5 weather), Airflow, Great Expectations and the PostgreSQL star schema. It adds a next-day AQI model, real Kafka producer/consumer, a Python static report and a Streamlit prediction dashboard.
+This extends the [second delivery](README_PREVIOUS_DELIVERIES.md). It preserves the three sources (Kaggle air-quality measurements, Wikipedia city coordinates, Open-Meteo ERA5 weather), Airflow, Great Expectations and the PostgreSQL star schema. It adds an AQI estimation model (same-day AQI and CPCB category from the day's pollutant readings), real Kafka producer/consumer, a Python static report and a Streamlit dashboard of the live estimates.
 
 The Kafka stream is a **historical replay**, not live sensor data. Model accuracy must be assessed separately from the correctness of the data architecture.
 
@@ -125,12 +125,16 @@ Set `INDIA_DATABASE_URL=postgresql://india:india_demo_local@localhost:55432/indi
 
 ## Prediction contract
 
-Target: next local day's numeric AQI per city. Inputs: city, target month and weekday, origin-day AQI/PM2.5/PM10/NO2/weather, and trailing seven-day mean AQI. `aqi_lag1` is the **previous day relative to the target**. The next-day observed AQI and AQI category never enter events or input features.
+Use case: as soon as a city's daily pollutant readings arrive, estimate that day's AQI and its CPCB category (Good, Satisfactory, Moderate, Poor, Very Poor, Severe) without waiting for the official calculation.
 
-All cities share date cutoffs: train 2015–2021, validation 2022, test 2023–2024. Ridge and Random Forest are selected using validation MAE, then the chosen pipeline is refitted through 2022 and evaluated on 2023–2024. A mean baseline and previous-day persistence baseline are reported with MAE, RMSE and R². The mean is fitted on training for validation, then on training plus validation for the final test. Missing/non-finite source values are rejected; incomplete seven-day histories are excluded. The model is saved with preprocessing, its SHA-256 and library versions.
+Target: the numeric AQI of the same city and local day. Inputs: `city_name` and the nine pollutant readings of that day (`pm25`, `pm10`, `no_value`, `no2`, `nox`, `nh3`, `co`, `so2`, `o3`). The observed AQI and AQI category never enter events or input features.
 
-Topic `india.aqi.features.v1` has one partition for the demonstration. Events include schema version, deterministic UUID, simulation flag, replay ID, publication timestamp, historical origin/target dates, city/measurement/run provenance and the documented `features` object. See the technical report for the field definitions.
+Why not a next-day forecast: the first version forecast tomorrow's AQI and did not beat a constant-mean baseline. The training data show why: day-to-day AQI autocorrelation is close to zero in every city and monthly averages are almost flat, so past values carry no information about the next day. The evidence is stored in `artifacts/metadata.json` under `forecastability` and discussed in the ML notebook.
+
+All cities share date cutoffs: train 2015–2021, validation 2022, test 2023–2024. Ridge, HistGradientBoosting and Random Forest are compared by validation MAE; the chosen pipeline is refitted through 2022 and evaluated on 2023–2024 against a constant-mean baseline and the linear model, with MAE, RMSE, R² and CPCB category accuracy. Missing/negative/non-finite readings are rejected. The model is saved with preprocessing, its SHA-256 and library versions.
+
+Topic `india.aqi.features.v1` has one partition for the demonstration. Events (schema `india.aqi.nowcast.v1`) include schema version, deterministic UUID, simulation flag, replay ID, publication timestamp, the historical measurement date (`origin_date` = `target_date`), city/measurement/run provenance and the documented `features` object. See the technical report for the field definitions.
 
 ## Value and limits
 
-The static report supports retrospective comparisons across cities/time and assesses model error. The operational path demonstrates per-message scoring and auditable prediction delivery. Neither successful streaming nor a fitted model proves useful early warning ability. Kaggle provenance/units, India local-day assumptions, ERA5 reanalysis availability and weak predictive relationships remain material limitations. There is no causal interpretation and no claim of real-world deployment.
+The static report supports retrospective comparisons across cities/time and assesses model error. The operational path demonstrates per-message AQI estimation and auditable delivery of each estimate. The model estimates the current day's AQI; it is not an early-warning forecast. Kaggle provenance/units, India local-day assumptions and ERA5 reanalysis availability remain limitations, and a change in the official AQI formula or sensor calibration requires retraining. There is no causal interpretation and no claim of real-world deployment.

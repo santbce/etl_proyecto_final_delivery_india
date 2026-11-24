@@ -1,8 +1,17 @@
-"""Next-day AQI regression from the validated India dimensional warehouse.
+"""Same-day AQI estimation (nowcast) from the validated India dimensional warehouse.
 
-Feature engineering is shared by offline training and the Kafka producer. Every
-numeric observation in an event belongs to origin_date or an earlier date;
-target_date is the following local calendar day in India.
+The model receives the pollutant readings of one city and one local day and
+estimates the AQI of that same city-day. Feature engineering is shared by
+offline training and the Kafka producer; the observed AQI and AQI category are
+never inference features.
+
+Why not next-day forecasting: the exploratory analysis and the second delivery
+showed that day-to-day AQI persistence in this dataset is practically zero
+(lag-1 autocorrelation close to 0 in every city) and there is no seasonality,
+so yesterday's values cannot predict tomorrow. The relationship between the
+pollutants and the AQI of the same day is strong but non-linear (the CPCB AQI
+is the maximum of piecewise sub-indices). That is the relationship this model
+learns. The evidence is stored in the metadata under ``forecastability``.
 """
 from __future__ import annotations
 
@@ -18,22 +27,28 @@ import numpy as np
 import pandas as pd
 
 CITIES = ["Bangalore", "Chennai", "Delhi", "Kolkata", "Mumbai"]
-NUMERIC_FEATURES = [
-    "month", "day_of_week", "aqi_lag1", "aqi_mean7", "pm25_lag1",
-    "pm10_lag1", "no2_lag1", "temperature_lag1", "precipitation_lag1", "wind_lag1",
-]
+# Pollutant readings of the observation day, named as in india_dw.fact_air_quality.
+NUMERIC_FEATURES = ["pm25", "pm10", "no_value", "no2", "nox", "nh3", "co", "so2", "o3"]
 FEATURE_COLUMNS = ["city_name"] + NUMERIC_FEATURES
-SOURCE_MEASURES = [
-    "aqi", "pm25", "pm10", "no2", "temperature_2m_mean",
-    "precipitation_sum", "wind_speed_10m_max",
-]
+# 0 = the estimated AQI belongs to the same local day as the readings.
+HORIZON_DAYS = 0
+SOURCE_MEASURES = ["aqi"] + NUMERIC_FEATURES
 REQUIRED_COLUMNS = ["measurement_id", "city_id", "city_name", "date", "run_id"] + SOURCE_MEASURES
 WAREHOUSE_SQL = """SELECT measurement_id, city_id, city_name, date, run_id,
-    aqi, pm25, pm10, no2, temperature_2m_mean, precipitation_sum, wind_speed_10m_max
+    aqi, pm25, pm10, no_value, no2, nox, nh3, co, so2, o3
     FROM india_dw.air_quality_enriched v
     WHERE EXISTS (SELECT 1 FROM india_dw.etl_runs r WHERE r.run_id=v.run_id
                   AND (r.quality_result->>'success')::boolean IS TRUE)
     ORDER BY city_id, date"""
+
+# Official CPCB AQI categories, used to translate an estimated AQI into a category.
+AQI_BINS = [-np.inf, 50, 100, 200, 300, 400, np.inf]
+AQI_LABELS = ["Good", "Satisfactory", "Moderate", "Poor", "Very Poor", "Severe"]
+
+
+def aqi_category(values) -> list[str]:
+    """Map AQI values to CPCB categories (0-50 Good ... >400 Severe)."""
+    return pd.cut(pd.Series(values, dtype=float), bins=AQI_BINS, labels=AQI_LABELS).astype(str).tolist()
 
 
 def _source_frame(df: pd.DataFrame) -> pd.DataFrame:
@@ -60,52 +75,33 @@ def _source_frame(df: pd.DataFrame) -> pd.DataFrame:
         source[name] = pd.to_numeric(source[name], errors="raise")
         if not np.isfinite(source[name].to_numpy(dtype=float)).all():
             raise ValueError(f"Non-finite source values in {name}")
-    if (source[[c for c in SOURCE_MEASURES if c != "temperature_2m_mean"]] < 0).any().any():
-        raise ValueError("Negative AQI, pollutant, rain or wind value")
+    if (source[SOURCE_MEASURES] < 0).any().any():
+        raise ValueError("Negative AQI or pollutant value")
     return source.sort_values(["city_id", "date"]).reset_index(drop=True)
 
 
 def build_features(df: pd.DataFrame) -> pd.DataFrame:
-    """Build inference rows, excluding incomplete seven-day histories and gaps.
+    """Build one inference row per city-day from that day's pollutant readings.
 
-    The row at origin day t contains the AQI at t (aqi_lag1 relative to the
-    forecast day t+1) and a trailing mean from t-6 through t. No shift toward a
-    future observation, centered rolling window or target category is used.
+    ``origin_date`` is the day of the readings and ``target_date`` the day whose
+    AQI is estimated; with HORIZON_DAYS = 0 both are the same local day. The
+    observed AQI and its category are not copied into the features.
     """
     source = _source_frame(df)
-    pieces = []
-    for _, city in source.groupby("city_id", sort=True):
-        city = city.copy()
-        seven_consecutive = city["date"].sub(city["date"].shift(6)).dt.days.eq(6)
-        city["origin_date"] = city["date"].dt.strftime("%Y-%m-%d")
-        tomorrow = city["date"] + pd.Timedelta(days=1)
-        city["target_date"] = tomorrow.dt.strftime("%Y-%m-%d")
-        city["month"] = tomorrow.dt.month.astype(int)
-        city["day_of_week"] = tomorrow.dt.dayofweek.astype(int)
-        city["aqi_mean7"] = city["aqi"].rolling(window=7, min_periods=7).mean()
-        mapping = {
-            "aqi": "aqi_lag1", "pm25": "pm25_lag1", "pm10": "pm10_lag1",
-            "no2": "no2_lag1", "temperature_2m_mean": "temperature_lag1",
-            "precipitation_sum": "precipitation_lag1", "wind_speed_10m_max": "wind_lag1",
-        }
-        for original, feature in mapping.items():
-            city[feature] = city[original]
-        pieces.append(city.loc[seven_consecutive, [
-            "measurement_id", "city_id", "run_id", "origin_date", "target_date",
-        ] + FEATURE_COLUMNS])
-    return pd.concat(pieces, ignore_index=True).sort_values(
-        ["target_date", "city_id"]
-    ).reset_index(drop=True)
+    day = source["date"].dt.strftime("%Y-%m-%d")
+    features = source[["measurement_id", "city_id", "run_id"]].copy()
+    features["origin_date"] = day
+    features["target_date"] = (source["date"] + pd.Timedelta(days=HORIZON_DAYS)).dt.strftime("%Y-%m-%d")
+    features[FEATURE_COLUMNS] = source[FEATURE_COLUMNS]
+    return features.sort_values(["target_date", "city_id"]).reset_index(drop=True)
 
 
 def training_labels(df: pd.DataFrame) -> pd.DataFrame:
-    """Attach observed next-day AQI for supervised learning, never for events."""
+    """Attach the observed AQI of the same city-day for supervised learning only."""
     source = _source_frame(df)
-    labels = source[["city_id", "date", "aqi"]].copy()
-    labels["target_date"] = labels["date"].dt.strftime("%Y-%m-%d")
-    labels = labels.rename(columns={"aqi": "target_aqi"}).drop(columns="date")
+    labels = source[["measurement_id", "aqi"]].rename(columns={"aqi": "target_aqi"})
     return build_features(source).merge(
-        labels, on=["city_id", "target_date"], how="inner", validate="one_to_one"
+        labels, on="measurement_id", how="inner", validate="one_to_one"
     ).sort_values(["target_date", "city_id"]).reset_index(drop=True)
 
 
@@ -118,6 +114,30 @@ def temporal_split(labeled: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, p
     if any(part.empty for part in [train_frame, validation, test]):
         raise ValueError("Training, validation and test periods must all contain observations")
     return train_frame, validation, test
+
+
+def forecastability(df: pd.DataFrame) -> dict:
+    """Evidence on whether next-day forecasting is supported by the data.
+
+    Computed on the training period only (2015-2021): lag-1 autocorrelation of
+    AQI per city and the spread of monthly mean AQI (seasonality).
+    """
+    source = _source_frame(df)
+    period = source.loc[source["date"].between("2015-01-01", "2021-12-31")]
+    autocorrelation = {
+        city: float(group.sort_values("date")["aqi"].autocorr(1))
+        for city, group in period.groupby("city_name")
+    }
+    monthly = period.groupby(period["date"].dt.month)["aqi"].mean()
+    return {
+        "period": "2015-01-01 to 2021-12-31 (training data only)",
+        "aqi_lag1_autocorrelation_by_city": autocorrelation,
+        "max_abs_lag1_autocorrelation": float(max(abs(v) for v in autocorrelation.values())),
+        "monthly_mean_aqi_range": float(monthly.max() - monthly.min()),
+        "conclusion": ("Next-day AQI is not predictable from past values in this dataset: persistence "
+                       "is close to zero and there is no seasonal pattern. The model therefore estimates "
+                       "the AQI of the same day from that day's pollutant readings."),
+    }
 
 
 def read_warehouse(database_url: str) -> pd.DataFrame:
@@ -134,10 +154,13 @@ def read_warehouse(database_url: str) -> pd.DataFrame:
 def _scores(actual, predicted) -> dict:
     from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
+    actual = np.asarray(actual, dtype=float)
+    predicted = np.asarray(predicted, dtype=float)
     return {
         "mae": float(mean_absolute_error(actual, predicted)),
         "rmse": float(np.sqrt(mean_squared_error(actual, predicted))),
         "r2": float(r2_score(actual, predicted)),
+        "category_accuracy": float(np.mean(np.array(aqi_category(actual)) == np.array(aqi_category(predicted)))),
     }
 
 
@@ -158,24 +181,32 @@ def _period(part: pd.DataFrame) -> dict:
     return {"rows": int(len(part)), "start": str(part.target_date.min()), "end": str(part.target_date.max())}
 
 
+def candidate_models() -> dict:
+    from sklearn.ensemble import HistGradientBoostingRegressor, RandomForestRegressor
+    from sklearn.linear_model import Ridge
+
+    return {
+        "ridge": _pipeline(Ridge(alpha=10.0)),
+        "hist_gradient_boosting": _pipeline(HistGradientBoostingRegressor(
+            max_iter=500, learning_rate=0.1, max_leaf_nodes=31, random_state=42
+        )),
+        "random_forest": _pipeline(RandomForestRegressor(
+            n_estimators=60, min_samples_leaf=3, random_state=42, n_jobs=-1
+        )),
+    }
+
+
 def train(database_url: str, outdir: str | Path) -> dict:
     """Select on 2022 only, refit through 2022, then evaluate untouched 2023-24."""
     import joblib
     from sklearn.base import clone
-    from sklearn.ensemble import RandomForestRegressor
-    from sklearn.linear_model import Ridge
 
     frame = read_warehouse(database_url)
     labeled = training_labels(frame)
     training, validation, test = temporal_split(labeled)
     if set(training.city_name.unique()) != set(CITIES):
         raise ValueError("The training warehouse must include all five documented cities")
-    candidates = {
-        "ridge": _pipeline(Ridge(alpha=10.0)),
-        "random_forest": _pipeline(RandomForestRegressor(
-            n_estimators=120, max_depth=8, min_samples_leaf=20, random_state=42, n_jobs=-1
-        )),
-    }
+    candidates = candidate_models()
     validation_scores = {}
     for name, candidate in candidates.items():
         candidate.fit(training[FEATURE_COLUMNS], training.target_aqi)
@@ -185,22 +216,22 @@ def train(database_url: str, outdir: str | Path) -> dict:
     validation_scores["mean_baseline"] = _scores(
         validation.target_aqi, np.full(len(validation), training.target_aqi.mean())
     )
-    validation_scores["persistence_baseline"] = _scores(validation.target_aqi, validation.aqi_lag1)
     selected_name = min(candidates, key=lambda name: validation_scores[name]["mae"])
     selected = clone(candidates[selected_name])
     development = pd.concat([training, validation], ignore_index=True)
     selected.fit(development[FEATURE_COLUMNS], development.target_aqi)
     predictions = selected.predict(test[FEATURE_COLUMNS])
     reference_mean = float(development.target_aqi.mean())
+    linear = clone(candidates["ridge"]).fit(development[FEATURE_COLUMNS], development.target_aqi)
     test_scores = {
         "selected_model": _scores(test.target_aqi, predictions),
+        "linear_reference": _scores(test.target_aqi, linear.predict(test[FEATURE_COLUMNS])),
         "mean_baseline": _scores(test.target_aqi, np.full(len(test), reference_mean)),
-        "persistence_baseline": _scores(test.target_aqi, test.aqi_lag1),
     }
     output = Path(outdir)
     output.mkdir(parents=True, exist_ok=True)
     temporary_model = output / "model.pending.joblib"
-    joblib.dump(selected, temporary_model)
+    joblib.dump(selected, temporary_model, compress=3)
     model_path = output / "model.joblib"
     temporary_model.replace(model_path)
     model_sha = hashlib.sha256(model_path.read_bytes()).hexdigest()
@@ -209,11 +240,14 @@ def train(database_url: str, outdir: str | Path) -> dict:
         "model_sha256": model_sha,
         "trained_at_utc": datetime.now(timezone.utc).isoformat(),
         "model_name": selected_name,
-        "target": "AQI at the next local calendar day in India",
-        "horizon_days": 1,
+        "target": "AQI of the same city and local day, estimated from that day's pollutant readings (nowcast)",
+        "horizon_days": HORIZON_DAYS,
+        "use_case": ("Give an immediate AQI value and CPCB category as soon as a city's daily pollutant "
+                     "readings arrive, without waiting for the official AQI calculation and publication."),
         "feature_columns": FEATURE_COLUMNS,
         "numeric_features": NUMERIC_FEATURES,
         "cities": CITIES,
+        "aqi_categories": dict(zip(AQI_LABELS, ["0-50", "51-100", "101-200", "201-300", "301-400", ">400"])),
         "source": "PostgreSQL india_dw.air_quality_enriched (validated dimensional warehouse)",
         "source_rows": int(len(frame)),
         "labeled_rows": int(len(labeled)),
@@ -221,36 +255,41 @@ def train(database_url: str, outdir: str | Path) -> dict:
         "source_run_ids": sorted(frame.run_id.astype(str).unique().tolist()),
         "split": {"train": _period(training), "validation": _period(validation), "test": _period(test)},
         "fit_through": str(development.target_date.max()),
-        "selection_rule": "Lowest validation MAE among Ridge and RandomForest; test never selects the model",
+        "selection_rule": ("Lowest validation MAE among Ridge, HistGradientBoosting and RandomForest; "
+                           "test never selects the model"),
         "selection_validation_mae": validation_scores[selected_name]["mae"],
         "metrics": {"validation": validation_scores, "test": test_scores},
         "baseline_mean_aqi": reference_mean,
         "beats_mean_baseline_on_test": test_scores["selected_model"]["mae"] < test_scores["mean_baseline"]["mae"],
-        "beats_persistence_on_test": test_scores["selected_model"]["mae"] < test_scores["persistence_baseline"]["mae"],
         "by_city_test": {
-            city: _scores(test.loc[test.city_name.eq(city), "target_aqi"], predictions[test.city_name.eq(city)])
+            city: _scores(test.loc[test.city_name.eq(city), "target_aqi"], predictions[test.city_name.eq(city).to_numpy()])
             for city in CITIES
         },
+        "forecastability": forecastability(frame),
         "preprocessing": {
             "numeric": "StandardScaler fitted on the development partition only",
             "categorical": "OneHotEncoder fitted on city_name; unknown cities are rejected",
             "missing": "Missing/non-finite source values are rejected; no hidden imputation",
-            "history": "First six dates and incomplete consecutive seven-day windows are excluded",
+            "leakage": "The observed AQI and AQI category of the day are never inference features",
         },
         "limitations": [
-            "Academic next-day prediction experiment, not a validated public warning system.",
+            "Academic AQI estimation experiment, not a validated public warning system.",
+            "The model reproduces the relationship between pollutant readings and AQI learned from 2015-2022; "
+            "if the official AQI formula or sensor calibration changes, it must be retrained.",
+            "It estimates the current day's AQI; it is not a forecast of future air quality.",
+            "Next-day forecasting was evaluated in the exploratory analysis and rejected: the data show "
+            "practically no day-to-day persistence or seasonality (see forecastability).",
             "The original Kaggle source does not establish measurement units or station provenance for every pollutant.",
-            "ERA5 weather is historical reanalysis; only weather from the origin day enters a forecast event.",
             "Daily timestamps are assumed to represent local days in India, consistent with the earlier ETL.",
-            "Weak associations and weak temporal persistence can limit accuracy; baseline comparisons are reported even when superior.",
             "The stream replays historical validated observations; event creation time is distinct from the historical observation date.",
-            "The fitted model uses target dates through 2022 only; demo forecasts for 2023-24 are chronologically out of training.",
         ],
         "versions": {name: importlib.metadata.version(name) for name in ["scikit-learn", "pandas", "numpy", "joblib"]},
     }
     (output / "metadata.json").write_text(json.dumps(metadata, indent=2, ensure_ascii=False), encoding="utf-8")
-    result = test[["city_id", "city_name", "origin_date", "target_date", "target_aqi", "aqi_lag1"]].copy()
+    result = test[["city_id", "city_name", "origin_date", "target_date", "target_aqi"]].copy()
     result["predicted_aqi"] = predictions
+    result["actual_category"] = aqi_category(result.target_aqi)
+    result["predicted_category"] = aqi_category(result.predicted_aqi)
     result["mean_baseline"] = reference_mean
     result["error"] = result.predicted_aqi - result.target_aqi
     result.to_csv(output / "test_predictions.csv", index=False)

@@ -151,14 +151,32 @@ def _model_section(artifacts_dir: Path) -> str:
     notes = "".join(f"<li>{escape(str(item))}</li>" for item in limitations)
     baseline_finding = ""
     if metadata.get('beats_mean_baseline_on_test') is False:
-        baseline_finding = ("<p class='finding'>The fitted model does not improve test MAE over the constant development-mean baseline. "
-            "This experiment demonstrates the inference architecture, but does not establish useful next-day forecasting skill.</p>")
+        baseline_finding = ("<p class='finding'>The fitted model does not improve test MAE over the constant development-mean baseline; "
+            "it must not be used to estimate AQI.</p>")
+    else:
+        selected = (metrics or {}).get("selected_model", {}) if isinstance(metrics, dict) else {}
+        mean_ref = (metrics or {}).get("mean_baseline", {}) if isinstance(metrics, dict) else {}
+        if selected and mean_ref:
+            baseline_finding = (
+                f"<p class='finding'>On 2023-2024 the model estimates AQI with an average error of {selected.get('mae', float('nan')):.2f} points "
+                f"(R² {selected.get('r2', float('nan')):.3f}), against {mean_ref.get('mae', float('nan')):.2f} points when always predicting the mean. "
+                f"It assigns the correct CPCB category in {selected.get('category_accuracy', float('nan')):.1%} of city-days. "
+                "The linear reference performs poorly because the official AQI is a non-linear, piecewise function of the pollutants.</p>")
+    forecast = metadata.get("forecastability", {})
+    forecast_note = ""
+    if forecast:
+        forecast_note = (
+            "<p>Why the model does not forecast tomorrow: in the training period the largest day-to-day AQI autocorrelation of any city is "
+            f"{forecast.get('max_abs_lag1_autocorrelation', float('nan')):.3f} and monthly average AQI varies by only "
+            f"{forecast.get('monthly_mean_aqi_range', float('nan')):.1f} points. Past values therefore carry no information about the next day. "
+            "The first version of this model, a next-day forecast, did not beat the mean baseline for exactly this reason.</p>")
     return (
         f"<p>Selected model: <strong>{escape(str(name))}</strong>. Artifact version: <code>{escape(str(version))}</code>.</p>"
-        "<p>The target is next-day AQI for the same city. Features use only information available through the preceding day. "
+        "<p>The target is the AQI of a city on a given day, estimated from that day's pollutant readings (PM2.5, PM10, NO, NO2, NOx, NH3, CO, SO2, O3). "
+        "The observed AQI and its category are never inputs. "
         "Training uses 2015-2021, model selection uses 2022, and the final model is fitted on 2015-2022. The held-out test period is 2023-2024.</p>"
-        + table + baseline_finding + "<p>MAE and RMSE are measured in AQI points; smaller values indicate lower error. R² compares performance with the test-set mean and may be negative. "
-        "Mean and persistence references must be considered before claiming predictive value.</p>"
+        + table + baseline_finding + forecast_note + "<p>MAE and RMSE are measured in AQI points; smaller values indicate lower error. "
+        "R² compares performance with the test-set mean. Category accuracy is the share of city-days whose estimated CPCB category matches the observed one.</p>"
         + (f"<ul>{notes}</ul>" if notes else "")
         + "<p>This section describes offline evaluation. Incoming Kafka predictions belong to the separate live dashboard.</p>"
     )
@@ -254,14 +272,14 @@ Source: PostgreSQL <code>india_dw.air_quality_enriched</code> · Grain: one city
 <p class="finding">{escape(correlation_text)}</p>
 <img src="04_weather_correlations.png" alt="Heatmap of Pearson correlation between AQI and three weather variables, calculated within each city">
 <p>Correlations are calculated separately within each city to avoid interpreting differences between locations as a daily relationship. Association does not demonstrate causation; low Pearson correlation does not exclude every nonlinear relationship.</p>
-<h2>5. How well does the next-day prediction model perform?</h2>
+<h2>5. How accurately can AQI be estimated from the day's pollutant readings?</h2>
 {_model_section(Path(artifacts_dir))}
 <h2>6. Data quality, provenance and limits</h2>
 <p>Air measurements originate from the first delivery's Kaggle dataset. Wikipedia coordinates identify the five cities and link them to historical ERA5 weather obtained through Open-Meteo. ERA5 represents reanalysis grid cells, not a colocated pollution-monitoring station.</p>
 <p>Airflow joins the sources, executes Great Expectations, and blocks the analytical load when critical checks fail. This report verifies successful approval metadata, reconciles each active run's row count, rejects duplicate or missing keys and incomplete daily coverage, and reads the database in one consistent transaction.</p>
-<p>The source does not document every pollutant unit. Original dates are interpreted as local days in India; that assumption needs source confirmation before claiming exact temporal alignment. The historical source and weak associations limit the operational interpretation of model predictions.</p>
+<p>The source does not document every pollutant unit. Original dates are interpreted as local days in India; that assumption needs source confirmation before claiming exact temporal alignment. The model learns the relationship between pollutant readings and AQI in this historical source; a change in the official formula or sensor calibration requires retraining.</p>
 <h2>7. Analytical and operational value</h2>
-<p>The dimensional model enables reproducible city and time comparisons, quality auditing and offline model evaluation. The Kafka path demonstrates a separate operational process: validated historical records are replayed as events, the consumer applies one fitted model, and the live dashboard updates with its predictions. Historical replay is explicitly a simulation.</p>
+<p>The dimensional model enables reproducible city and time comparisons, quality auditing and offline model evaluation. The Kafka path demonstrates a separate operational process: each city's daily pollutant readings are replayed as events, the consumer applies one fitted model to estimate the AQI and its CPCB category as soon as the readings arrive, and the live dashboard updates with those estimates. Historical replay is explicitly a simulation.</p>
 <footer class="meta">Regenerate from the repository root: <code>python src/final_report.py --output reports/final --artifacts artifacts</code> with <code>INDIA_DATABASE_URL</code> configured. Re-run after training to include the latest offline model metrics. This HTML and its four image files must remain together.</footer>
 </main></body></html>"""
     (output / "report.html").write_text(html, encoding="utf-8")

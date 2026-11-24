@@ -13,14 +13,12 @@ from final_stream import SCHEMA, TOPIC, event_from_row, open_store, process_mess
 
 
 def feature_row():
-    # 2023-01-02 is Monday; every measurement belongs to 2023-01-01 or earlier.
-    return {"origin_date": "2023-01-01", "target_date": "2023-01-02",
+    # Pollutant readings of Delhi on 2023-01-01; the AQI of that same day is estimated.
+    return {"origin_date": "2023-01-01", "target_date": "2023-01-01",
             "run_id": "successful-etl-run", "city_id": 1, "measurement_id": 1001,
-            "city_name": "Delhi", "month": 1, "day_of_week": 0,
-            "aqi_lag1": 250., "aqi_mean7": 230., "pm25_lag1": 40.,
-            "pm10_lag1": 60., "no2_lag1": 20., "temperature_lag1": 18.,
-            "precipitation_lag1": 0., "wind_lag1": 3.,
-            "target_aqi": 999.}  # A producer must never copy this label.
+            "city_name": "Delhi", "pm25": 140., "pm10": 260., "no_value": 90.,
+            "no2": 60., "nox": 120., "nh3": 25., "co": 4.5, "so2": 50., "o3": 80.,
+            "aqi": 999., "target_aqi": 999.}  # A producer must never copy the observed AQI.
 
 
 class CountingModel:
@@ -44,6 +42,8 @@ class EventContractTests(unittest.TestCase):
         self.assertEqual(event["schema_version"], SCHEMA)
         self.assertEqual(set(event["features"]), set(FEATURE_COLUMNS))
         self.assertNotIn("target_aqi", json.dumps(event))
+        self.assertNotIn("999", json.dumps(event["features"]))
+        self.assertEqual(event["origin_date"], event["target_date"])
         self.assertEqual(event["source_measurement_id"], 1001)
         self.assertEqual(event["source_run_id"], "successful-etl-run")
         self.assertTrue(event["simulation"])
@@ -58,7 +58,7 @@ class EventContractTests(unittest.TestCase):
         self.assertNotEqual(first["event_id"], other_replay["event_id"])
 
     def test_target_or_unknown_feature_is_rejected(self):
-        for field in ["target_aqi", "aqi_bucket", "future_temperature"]:
+        for field in ["target_aqi", "aqi", "aqi_bucket", "temperature"]:
             with self.subTest(field=field):
                 event = event_from_row(feature_row(), "demo")
                 event["features"][field] = 400.
@@ -73,17 +73,17 @@ class EventContractTests(unittest.TestCase):
         for value in [float("nan"), float("inf"), -1., True, "250"]:
             with self.subTest(value=repr(value)):
                 event = event_from_row(feature_row(), "demo")
-                event["features"]["aqi_lag1"] = value
+                event["features"]["pm25"] = value
                 with self.assertRaises(ValueError):
                     validate_event(event)
-        # Below-zero temperatures are meaningful, unlike negative AQI/rain/wind.
+        # A reading of exactly zero is valid.
         event = event_from_row(feature_row(), "demo")
-        event["features"]["temperature_lag1"] = -5.
-        self.assertEqual(validate_event(event)["features"]["temperature_lag1"], -5.)
+        event["features"]["so2"] = 0.
+        self.assertEqual(validate_event(event)["features"]["so2"], 0.)
 
-    def test_date_horizon_calendar_and_timezone_must_be_consistent(self):
+    def test_dates_and_timezone_must_be_consistent(self):
         changes = [
-            ("target_date", "2023-01-03"),
+            ("target_date", "2023-01-02"),
             ("published_at", "2026-11-22T10:00:00"),
             ("origin_date", "2014-12-31"),
         ]
@@ -93,11 +93,6 @@ class EventContractTests(unittest.TestCase):
                 event[key] = value
                 with self.assertRaises(ValueError):
                     validate_event(event)
-        for key, value in [("month", 2), ("day_of_week", 3)]:
-            event = event_from_row(feature_row(), "demo")
-            event["features"][key] = value
-            with self.assertRaises(ValueError):
-                validate_event(event)
 
 
 class DurableInferenceTests(unittest.TestCase):
