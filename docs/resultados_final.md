@@ -1,4 +1,19 @@
-# Final-delivery verification — 23 November 2026
+# Final-delivery verification — 23 and 24 November 2026
+
+## Final run with the AQI estimation model — 24 November 2026
+
+After the model was redesigned (see "Model evaluation"), the complete project was run again from a clean checkout in a GitHub Codespace with Docker Compose:
+
+- Airflow run `manual__2026-11-25T00:00:00+00:00` completed all 12 tasks with no failures, including fresh extraction of the three sources, Great Expectations validation, warehouse load, training, the static report and a 100-event Kafka replay.
+- 27 unit tests passed (`tests/test_final_ml.py`, `test_final_stream.py`, `test_final_report.py`).
+- The Kafka integration test processed 43 messages: 20 valid events, 20 redeliveries ignored as duplicates and 3 invalid messages rejected; every prediction matched the serialized model and the warehouse was unchanged.
+- The consumer recovery test and the audit (`tests/audit_final.py`) passed.
+- Both final notebooks (`03_modelo_predictivo.ipynb`, `04_demo_streaming.ipynb`) executed without errors.
+- The live consumer and Streamlit dashboard were restarted with the new model; the Airflow web interface showed the 12 green tasks.
+
+Evidence: `evidencias/final/airflow_task_states.csv`, `audit.json`, `integration.json`, `recovery.json`, `validation.json` and `artifacts/metadata.json`.
+
+## First verification — 23 November 2026
 
 The new repository was tested in a separate Docker Compose project, `india-verification`, with a new PostgreSQL volume and a new Kafka broker. The earlier demonstration services were kept separate.
 
@@ -14,13 +29,25 @@ Evidence: `evidencias/final/audit.json`, `airflow_task_states.csv`, `validation.
 
 Training used 2015–2021, selection used 2022, and the final fitted pipeline used 2015–2022. Testing used 2023–2024. The same feature function serves training and Kafka publication.
 
+**First version: next-day forecast (23 November).** The model forecast tomorrow's AQI from the previous day's values.
+
 | Test estimator | MAE | RMSE | R² |
 |---|---:|---:|---:|
 | Ridge model | 98.7733 | 114.1729 | -0.0015 |
 | Development mean | 98.6803 | 114.0930 | -0.0001 |
 | Previous-day AQI | 132.8741 | 162.5509 | -1.0301 |
 
-The model improves on previous-day persistence but does not beat the constant development-mean baseline. The result demonstrates the inference workflow; it does not establish useful next-day forecasting skill. The limitation remains in the report and model metadata.
+It did not beat the constant mean. The data explain why: in 2015–2021 the lag-1 autocorrelation of AQI is between −0.005 and 0.033 in the five cities and monthly average AQI varies by only 10.9 points. Yesterday's AQI carries no information about tomorrow's, so the forecast was abandoned.
+
+**Final version: same-day AQI estimation (24 November).** The model estimates the AQI of each city-day, and its CPCB category, from that day's nine pollutant readings. Validation MAE in 2022: Ridge 93.01, HistGradientBoosting 5.51, Random Forest 0.96 (selected), mean 96.71.
+
+| Test estimator (2023–2024) | MAE | RMSE | R² | Category accuracy |
+|---|---:|---:|---:|---:|
+| Random Forest (selected) | 1.2062 | 9.1013 | 0.9936 | 98.9% |
+| Linear reference (Ridge) | 95.5842 | 110.8087 | 0.0566 | 25.7% |
+| Development mean | 98.6788 | 114.0929 | -0.0001 | 30.1% |
+
+By city, test MAE ranges from 0.71 (Delhi) to 1.58 (Chennai) and category accuracy from 98.8% to 99.3%. The linear model fails because the official AQI is the maximum of piecewise sub-indices per pollutant, a non-linear relationship that tree ensembles capture. The model estimates the current day's AQI; it is not a forecast.
 
 ## Kafka, inference and recovery
 
