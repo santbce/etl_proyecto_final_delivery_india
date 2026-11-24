@@ -1,9 +1,9 @@
 {
   "success": true,
   "status": true,
-  "started_at_utc": "2026-11-23T13:51:58.032381+00:00",
-  "topic": "india.test.eea9d61b07d040e0a99053631d9594fc",
-  "group": "india-test-eea9d61b07d040e0a99053631d9594fc",
+  "started_at_utc": "2026-11-24T15:54:31.963664+00:00",
+  "topic": "india.test.2dce9cdd5f444ecbb154550121fa7f5b",
+  "group": "india-test-2dce9cdd5f444ecbb154550121fa7f5b",
   "expected": {
     "predicted": 20,
     "duplicate": 20,
@@ -15,11 +15,11 @@
   ],
   "warehouse_write_operations": 0,
   "consumer_warehouse_credentials_present": false,
-  "consumer_log": "runtime/integration_eea9d61b07d040e0a99053631d9594fc.log",
-  "prediction_store": "runtime/integration_eea9d61b07d040e0a99053631d9594fc.sqlite",
+  "consumer_log": "runtime/integration_2dce9cdd5f444ecbb154550121fa7f5b.log",
+  "prediction_store": "runtime/integration_2dce9cdd5f444ecbb154550121fa7f5b.sqlite",
   "warehouse_before": {
     "rows": 18265,
-    "md5": "4c0adacffcb6d1ed585b1d3792748267"
+    "md5": "0e9bbff9995b47e3311fa820461d53b5"
   },
   "counts": {
     "predicted": 20,
@@ -38,12 +38,12 @@
     41,
     42
   ],
-  "model_version": "90b6dd4d28661a89",
+  "model_version": "77be4af64d859e28",
   "warehouse_after": {
     "rows": 18265,
-    "md5": "4c0adacffcb6d1ed585b1d3792748267"
+    "md5": "0e9bbff9995b47e3311fa820461d53b5"
   },
   "warehouse_unchanged": true,
   "test_topic_deleted": true,
-  "completed_at_utc": "2026-11-23T13:52:05.481262+00:00"
+  "completed_at_utc": "2026-11-24T15:54:39.013390+00:00"
 }

@@ -1,5 +1,5 @@
 {
-  "started_at_utc": "2026-11-23T13:52:39.392187+00:00",
+  "started_at_utc": "2026-11-24T15:55:08.722002+00:00",
   "success": true,
   "dag_id": "etl_india_final",
   "checks": {
@@ -26,13 +26,13 @@
     "example_event_has_no_target": true
   },
   "airflow_run": {
-    "id": 1,
+    "id": 2,
     "dag_id": "etl_india_final",
-    "run_id": "manual__2026-11-23T00:00:00+00:00",
+    "run_id": "manual__2026-11-25T00:00:00+00:00",
     "state": "success",
-    "execution_date": "2026-11-23 00:00:00.000000",
-    "start_date": "2026-11-23 00:00:00.000000",
-    "end_date": "2026-11-23 13:51:25.460270"
+    "execution_date": "2026-11-25 00:00:00.000000",
+    "start_date": "2026-11-25 00:00:00.000000",
+    "end_date": "2026-11-24 15:54:06.470708"
   },
   "airflow_tasks": {
     "count": 12,
@@ -55,32 +55,32 @@
     "rows": 18265,
     "city_count": 5,
     "source_run_ids": [
-      "manual__2026-11-23T00:00:00+00:00"
+      "manual__2026-11-25T00:00:00+00:00"
     ],
     "etl_rows_recorded": 18265
   },
   "approved_batch": {
-    "run_id": "manual__2026-11-23T00:00:00+00:00",
-    "csv_sha256": "e4fe1eab1845dddce8efd574e04b76609f3817763a0e1a5bf9df24bb33f193d2",
+    "run_id": "manual__2026-11-25T00:00:00+00:00",
+    "csv_sha256": "075b86f7ef3c3609dc215667b72b39b1e646d27aaeff4356ca945a1361e9ac75",
     "coverage_exact": true
   },
   "weather_provenance": {
     "entries": 50,
     "modes": {
-      "http": 50,
-      "cache": 0
+      "http": 0,
+      "cache": 50
     },
     "note": "Read the stored extraction provenance; audit makes no HTTP requests."
   },
   "model": {
-    "name": "ridge",
-    "version": "90b6dd4d28661a89",
-    "sha256": "90b6dd4d28661a8919537583676ba6273fc1e3702219709d5387edafda9bf85d",
+    "name": "random_forest",
+    "version": "77be4af64d859e28",
+    "sha256": "77be4af64d859e2800feef714656c3bf12b4a1643dfaf04086a08da5658a22f5",
     "source_rows": 18265,
     "split": {
       "train": {
-        "rows": 12750,
-        "start": "2015-01-08",
+        "rows": 12785,
+        "start": "2015-01-01",
         "end": "2021-12-31"
       },
       "validation": {
@@ -97,41 +97,48 @@
     "metrics": {
       "validation": {
         "ridge": {
-          "mae": 96.84939166824586,
-          "rmse": 112.28829552946888,
-          "r2": -0.0027454385011440596
+          "mae": 93.00632858739972,
+          "rmse": 108.22091968464913,
+          "r2": 0.06858300788383132,
+          "category_accuracy": 0.2608219178082192
+        },
+        "hist_gradient_boosting": {
+          "mae": 5.508855695681936,
+          "rmse": 17.177078419273496,
+          "r2": 0.9765350132846613,
+          "category_accuracy": 0.958904109589041
         },
         "random_forest": {
-          "mae": 97.03060871308587,
-          "rmse": 112.45517906157289,
-          "r2": -0.0057282258326916136
+          "mae": 0.9619565399989333,
+          "rmse": 4.0533008481273445,
+          "r2": 0.9986934098041068,
+          "category_accuracy": 0.9917808219178083
         },
         "mean_baseline": {
-          "mae": 96.7092628611335,
-          "rmse": 112.13515015340191,
-          "r2": -1.2097407928512993e-05
-        },
-        "persistence_baseline": {
-          "mae": 128.89369863013698,
-          "rmse": 158.10534126646797,
-          "r2": -0.9879927663883625
+          "mae": 96.70803768971558,
+          "rmse": 112.1352207207732,
+          "r2": -1.3356036415279604e-05,
+          "category_accuracy": 0.303013698630137
         }
       },
       "test": {
         "selected_model": {
-          "mae": 98.77327127908458,
-          "rmse": 114.17293483538951,
-          "r2": -0.001508590351658512
+          "mae": 1.206225556417197,
+          "rmse": 9.10131352515602,
+          "r2": 0.993635907258345,
+          "category_accuracy": 0.9890560875512996
+        },
+        "linear_reference": {
+          "mae": 95.58422243516185,
+          "rmse": 110.80866278520446,
+          "r2": 0.056643650303462634,
+          "category_accuracy": 0.25718194254445964
         },
         "mean_baseline": {
-          "mae": 98.68034294617445,
-          "rmse": 114.09303893248551,
-          "r2": -0.00010741000590441807
-        },
-        "persistence_baseline": {
-          "mae": 132.8740902872777,
-          "rmse": 162.55093218445586,
-          "r2": -1.030052539326431
+          "mae": 98.6788119506625,
+          "rmse": 114.09285960688032,
+          "r2": -0.00010426617298886498,
+          "category_accuracy": 0.3009575923392613
         }
       }
     }
@@ -143,11 +150,11 @@
     "skipped": false,
     "warehouse_before": {
       "rows": 18265,
-      "sha256": "7b22c71dbab96f0a3019091a7eae154d5fb9c9c3009ba8b01581c9ec34779236"
+      "sha256": "79fe7893c3fac55afb495e3189ec58983f71060b874c81585e404bc538253327"
     },
     "warehouse_after": {
       "rows": 18265,
-      "sha256": "7b22c71dbab96f0a3019091a7eae154d5fb9c9c3009ba8b01581c9ec34779236"
+      "sha256": "79fe7893c3fac55afb495e3189ec58983f71060b874c81585e404bc538253327"
     },
     "scope": "Negative precipitation is rejected by GX; missing approval and changed CSV are blocked before loading.",
     "load_guard_blocked_invalid_or_changed_batch": true,
@@ -156,10 +163,10 @@
   "stream_contract": {
     "topic": "india.aqi.features.v1",
     "bootstrap_servers": "kafka:9092",
-    "event_schema": "india.aqi.next-day.v1",
+    "event_schema": "india.aqi.nowcast.v1",
     "example": "docs/event_example.json",
-    "feature_count": 11,
+    "feature_count": 10,
     "note": "Contract example only; actual Kafka delivery is audited separately."
   },
-  "finished_at_utc": "2026-11-23T13:52:57.104757+00:00"
+  "finished_at_utc": "2026-11-24T15:55:42.712695+00:00"
 }

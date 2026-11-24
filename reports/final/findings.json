@@ -4,7 +4,7 @@
   "period_start": "2015-01-01",
   "period_end": "2024-12-31",
   "run_ids": [
-    "manual__2026-11-23T00:00:00+00:00"
+    "manual__2026-11-25T00:00:00+00:00"
   ],
   "aqi_mean": 317.5052121543937,
   "aqi_std": 113.89481557892762,
@@ -88,11 +88,11 @@
     "mean_aqi": 242.45357142857142
   },
   "source": "PostgreSQL india_dw.air_quality_enriched, approved ETL runs only",
-  "generated_at_utc": "2026-11-23T13:51:13.568280+00:00",
+  "generated_at_utc": "2026-11-24T15:54:04.819454+00:00",
   "etl_runs": [
     {
-      "run_id": "manual__2026-11-23T00:00:00+00:00",
-      "loaded_at": "2026-11-23 13:51:07.765801+00:00",
+      "run_id": "manual__2026-11-25T00:00:00+00:00",
+      "loaded_at": "2026-11-24 15:53:32.650016+00:00",
       "rows": 18265
     }
   ]

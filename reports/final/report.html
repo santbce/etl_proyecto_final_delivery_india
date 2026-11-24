@@ -15,7 +15,7 @@ th,td{text-align:left;padding:10px 12px;border-bottom:1px solid #d9e2e6}th{backg
 <header><div class="eyebrow">ETL FINAL DELIVERY · SAMUEL FLORES &amp; SANTIAGO BECERRA</div>
 <h1>Air quality and weather in India</h1>
 <p>A static analytical view of 18,265 validated city-day measurements across 5 cities.</p>
-<p class="meta">Period: 2015-01-01 to 2024-12-31 · Generated: 2026-11-23T13:51:13.568280+00:00 UTC<br>
+<p class="meta">Period: 2015-01-01 to 2024-12-31 · Generated: 2026-11-24T15:54:04.819454+00:00 UTC<br>
 Source: PostgreSQL <code>india_dw.air_quality_enriched</code> · Grain: one city on one measurement day.</p></header>
 <p>This report supports historical comparison and review of the enriched data. It is a point-in-time output generated with Python after data-quality approval. The operational prediction dashboard is a separate application driven by the Kafka consumer.</p>
 <h2>1. Which cities have the highest average AQI?</h2>
@@ -75,42 +75,46 @@ Source: PostgreSQL <code>india_dw.air_quality_enriched</code> · Grain: one city
 <p class="finding">The largest absolute within-city Pearson correlation is 0.042. These weak linear associations do not support a strong weather-only explanation or forecast of AQI.</p>
 <img src="04_weather_correlations.png" alt="Heatmap of Pearson correlation between AQI and three weather variables, calculated within each city">
 <p>Correlations are calculated separately within each city to avoid interpreting differences between locations as a daily relationship. Association does not demonstrate causation; low Pearson correlation does not exclude every nonlinear relationship.</p>
-<h2>5. How well does the next-day prediction model perform?</h2>
-<p>Selected model: <strong>ridge</strong>. Artifact version: <code>90b6dd4d28661a89</code>.</p><p>The target is next-day AQI for the same city. Features use only information available through the preceding day. Training uses 2015-2021, model selection uses 2022, and the final model is fitted on 2015-2022. The held-out test period is 2023-2024.</p><table border="1" class="dataframe">
+<h2>5. How accurately can AQI be estimated from the day's pollutant readings?</h2>
+<p>Selected model: <strong>random_forest</strong>. Artifact version: <code>77be4af64d859e28</code>.</p><p>The target is the AQI of a city on a given day, estimated from that day's pollutant readings (PM2.5, PM10, NO, NO2, NOx, NH3, CO, SO2, O3). The observed AQI and its category are never inputs. Training uses 2015-2021, model selection uses 2022, and the final model is fitted on 2015-2022. The held-out test period is 2023-2024.</p><table border="1" class="dataframe">
   <thead>
     <tr style="text-align: right;">
       <th>Model / reference</th>
       <th>mae</th>
       <th>rmse</th>
       <th>r2</th>
+      <th>category_accuracy</th>
     </tr>
   </thead>
   <tbody>
     <tr>
       <td>selected_model</td>
-      <td>98.7733</td>
-      <td>114.1729</td>
-      <td>-0.0015</td>
+      <td>1.2062</td>
+      <td>9.1013</td>
+      <td>0.9936</td>
+      <td>0.9891</td>
+    </tr>
+    <tr>
+      <td>linear_reference</td>
+      <td>95.5842</td>
+      <td>110.8087</td>
+      <td>0.0566</td>
+      <td>0.2572</td>
     </tr>
     <tr>
       <td>mean_baseline</td>
-      <td>98.6803</td>
-      <td>114.0930</td>
+      <td>98.6788</td>
+      <td>114.0929</td>
       <td>-0.0001</td>
-    </tr>
-    <tr>
-      <td>persistence_baseline</td>
-      <td>132.8741</td>
-      <td>162.5509</td>
-      <td>-1.0301</td>
+      <td>0.3010</td>
     </tr>
   </tbody>
-</table><p class='finding'>The fitted model does not improve test MAE over the constant development-mean baseline. This experiment demonstrates the inference architecture, but does not establish useful next-day forecasting skill.</p><p>MAE and RMSE are measured in AQI points; smaller values indicate lower error. R² compares performance with the test-set mean and may be negative. Mean and persistence references must be considered before claiming predictive value.</p><ul><li>Academic next-day prediction experiment, not a validated public warning system.</li><li>The original Kaggle source does not establish measurement units or station provenance for every pollutant.</li><li>ERA5 weather is historical reanalysis; only weather from the origin day enters a forecast event.</li><li>Daily timestamps are assumed to represent local days in India, consistent with the earlier ETL.</li><li>Weak associations and weak temporal persistence can limit accuracy; baseline comparisons are reported even when superior.</li><li>The stream replays historical validated observations; event creation time is distinct from the historical observation date.</li><li>The fitted model uses target dates through 2022 only; demo forecasts for 2023-24 are chronologically out of training.</li></ul><p>This section describes offline evaluation. Incoming Kafka predictions belong to the separate live dashboard.</p>
+</table><p class='finding'>On 2023-2024 the model estimates AQI with an average error of 1.21 points (R² 0.994), against 98.68 points when always predicting the mean. It assigns the correct CPCB category in 98.9% of city-days. The linear reference performs poorly because the official AQI is a non-linear, piecewise function of the pollutants.</p><p>Why the model does not forecast tomorrow: in the training period the largest day-to-day AQI autocorrelation of any city is 0.033 and monthly average AQI varies by only 10.9 points. Past values therefore carry no information about the next day. The first version of this model, a next-day forecast, did not beat the mean baseline for exactly this reason.</p><p>MAE and RMSE are measured in AQI points; smaller values indicate lower error. R² compares performance with the test-set mean. Category accuracy is the share of city-days whose estimated CPCB category matches the observed one.</p><ul><li>Academic AQI estimation experiment, not a validated public warning system.</li><li>The model reproduces the relationship between pollutant readings and AQI learned from 2015-2022; if the official AQI formula or sensor calibration changes, it must be retrained.</li><li>It estimates the current day&#x27;s AQI; it is not a forecast of future air quality.</li><li>Next-day forecasting was evaluated in the exploratory analysis and rejected: the data show practically no day-to-day persistence or seasonality (see forecastability).</li><li>The original Kaggle source does not establish measurement units or station provenance for every pollutant.</li><li>Daily timestamps are assumed to represent local days in India, consistent with the earlier ETL.</li><li>The stream replays historical validated observations; event creation time is distinct from the historical observation date.</li></ul><p>This section describes offline evaluation. Incoming Kafka predictions belong to the separate live dashboard.</p>
 <h2>6. Data quality, provenance and limits</h2>
 <p>Air measurements originate from the first delivery's Kaggle dataset. Wikipedia coordinates identify the five cities and link them to historical ERA5 weather obtained through Open-Meteo. ERA5 represents reanalysis grid cells, not a colocated pollution-monitoring station.</p>
 <p>Airflow joins the sources, executes Great Expectations, and blocks the analytical load when critical checks fail. This report verifies successful approval metadata, reconciles each active run's row count, rejects duplicate or missing keys and incomplete daily coverage, and reads the database in one consistent transaction.</p>
-<p>The source does not document every pollutant unit. Original dates are interpreted as local days in India; that assumption needs source confirmation before claiming exact temporal alignment. The historical source and weak associations limit the operational interpretation of model predictions.</p>
+<p>The source does not document every pollutant unit. Original dates are interpreted as local days in India; that assumption needs source confirmation before claiming exact temporal alignment. The model learns the relationship between pollutant readings and AQI in this historical source; a change in the official formula or sensor calibration requires retraining.</p>
 <h2>7. Analytical and operational value</h2>
-<p>The dimensional model enables reproducible city and time comparisons, quality auditing and offline model evaluation. The Kafka path demonstrates a separate operational process: validated historical records are replayed as events, the consumer applies one fitted model, and the live dashboard updates with its predictions. Historical replay is explicitly a simulation.</p>
+<p>The dimensional model enables reproducible city and time comparisons, quality auditing and offline model evaluation. The Kafka path demonstrates a separate operational process: each city's daily pollutant readings are replayed as events, the consumer applies one fitted model to estimate the AQI and its CPCB category as soon as the readings arrive, and the live dashboard updates with those estimates. Historical replay is explicitly a simulation.</p>
 <footer class="meta">Regenerate from the repository root: <code>python src/final_report.py --output reports/final --artifacts artifacts</code> with <code>INDIA_DATABASE_URL</code> configured. Re-run after training to include the latest offline model metrics. This HTML and its four image files must remain together.</footer>
 </main></body></html>
