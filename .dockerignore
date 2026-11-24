@@ -1,0 +1,13 @@
+.git
+gunicorn.ctl
+runtime
+artifacts
+reports
+__pycache__
+.pytest_cache
+primera_entrega
+data/raw/weather
+data/raw/cities
+data/runs
+notebooks
+evidencias
