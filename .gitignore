@@ -223,11 +223,21 @@ __marimo__/
 .venv/
 *.pyc
 airflow_home/
-data/raw/cities/*.html
-data/raw/weather/*.json
 data/runs/
 data/*.sqlite
-primera_entrega/database/*.db
+
+# Raw and source data are never committed: src/final_setup.py downloads the
+# first-delivery database and the DAG extracts Wikipedia and Open-Meteo data.
+data/raw/
+data/*.zip
+data/*.part
+primera_entrega/
+database/*.db
+*.db
+*.csv.gz
+# Database dumps are generated locally with pg_dump when needed
+reports/**/*.sql
+reports/*.sql
 
 # Final-delivery runtime, credentials and temporary state
 gunicorn.ctl

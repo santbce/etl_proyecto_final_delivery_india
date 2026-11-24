@@ -32,6 +32,16 @@ docker compose build tools
 docker compose run --rm tools python src/final_setup.py
 ```
 
+### Data
+
+Raw data is not stored in this repository (see `.gitignore`). The three sources are obtained when the project runs:
+
+1. **Air-quality measurements (first delivery):** `src/final_setup.py` downloads the public first-delivery repository ([santbce/etl-calidad-aire-india](https://github.com/santbce/etl-calidad-aire-india)), unpacks its SQLite database into `primera_entrega/` and verifies its SHA-256, so every run extracts exactly the same records. The original dataset is the Kaggle [AQI Air Quality Data India 2015–2024](https://www.kaggle.com/datasets/sathvikisikella/cleaned-air-quality-india). The DAG task `preparar_ejecucion` performs the same step automatically.
+2. **City coordinates:** scraped from Wikipedia by the DAG.
+3. **Weather:** requested from the Open-Meteo historical API by the DAG.
+
+Downloaded and generated files (`data/raw/`, `data/*.zip`, `primera_entrega/`, SQLite databases and database dumps) stay local and are ignored by Git.
+
 ### Full extraction and Airflow path
 
 This fetches the three sources and runs quality checks before loading. Wikipedia/Open-Meteo must be reachable. The final DAG includes training, the static report and a finite 100-event Kafka replay.
@@ -51,7 +61,13 @@ Open http://localhost:8088. `airflow standalone` generates a local admin passwor
 
 ### Offline snapshot alternative
 
-If a source is unavailable during a demonstration, the included PostgreSQL dump preserves the earlier integration of all three sources. Restore **once into a new, empty project database**, then run the current GX checks before training. A restored snapshot is explicitly labelled; it is not presented as a fresh API extraction.
+If a source may be unavailable during a demonstration, save a local snapshot of the validated warehouse after a successful DAG run. The dump stays on your machine and is not committed:
+
+```sh
+docker compose exec -T postgres pg_dump -U india -d india > reports/warehouse.sql
+```
+
+To use it, restore it **once into a new, empty project database**, then re-run the quality checks before training. A restored snapshot is explicitly labelled; it is not presented as a fresh API extraction.
 
 ```sh
 docker compose exec -T postgres psql -U india -d india -v ON_ERROR_STOP=1 -f /opt/project/reports/warehouse.sql
@@ -61,9 +77,7 @@ docker compose run --rm tools python src/final_report.py
 docker compose run --rm tools python src/final_stream.py create-topic
 ```
 
-Do not restore the old dump on top of a populated schema. Use the full DAG or simply reuse the validated existing warehouse instead.
-
-The exact final-run snapshot is also included as `reports/final/warehouse_final.sql`. To reproduce the measured final results offline, restore that file instead of the older dump, into a new empty database. It already includes the final run's saved validation metadata. The older `reports/warehouse.sql` remains preserved from the second delivery.
+Do not restore a dump on top of a populated schema.
 
 ### Live inference demonstration
 
