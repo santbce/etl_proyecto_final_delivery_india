@@ -1,0 +1,11 @@
+services:
+  postgres:
+    ports: !override ["127.0.0.1:55433:5432"]
+  kafka:
+    ports: !override ["127.0.0.1:19093:19092"]
+    environment:
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://localhost:19093
+  dashboard:
+    ports: !override ["127.0.0.1:8503:8501"]
+  airflow:
+    ports: !override ["127.0.0.1:8089:8080"]
