@@ -1,0 +1,49 @@
+{
+  "success": true,
+  "status": true,
+  "started_at_utc": "2026-11-23T13:51:58.032381+00:00",
+  "topic": "india.test.eea9d61b07d040e0a99053631d9594fc",
+  "group": "india-test-eea9d61b07d040e0a99053631d9594fc",
+  "expected": {
+    "predicted": 20,
+    "duplicate": 20,
+    "rejected": 3
+  },
+  "commands": [
+    "python tests/integration_final.py",
+    "python src/final_stream.py consume --topic <isolated-test-topic> --group <isolated-test-group> --max-messages 43 --idle-timeout 30"
+  ],
+  "warehouse_write_operations": 0,
+  "consumer_warehouse_credentials_present": false,
+  "consumer_log": "runtime/integration_eea9d61b07d040e0a99053631d9594fc.log",
+  "prediction_store": "runtime/integration_eea9d61b07d040e0a99053631d9594fc.sqlite",
+  "warehouse_before": {
+    "rows": 18265,
+    "md5": "4c0adacffcb6d1ed585b1d3792748267"
+  },
+  "counts": {
+    "predicted": 20,
+    "duplicate": 20,
+    "rejected": 3
+  },
+  "acknowledged_messages": 43,
+  "committed_offset": 43,
+  "unique_predictions": 20,
+  "prediction_matches_serialized_model": true,
+  "target_excluded_from_features": true,
+  "replay_is_out_of_sample": true,
+  "duplicate_did_not_overwrite_first_offset": true,
+  "invalid_offsets": [
+    40,
+    41,
+    42
+  ],
+  "model_version": "90b6dd4d28661a89",
+  "warehouse_after": {
+    "rows": 18265,
+    "md5": "4c0adacffcb6d1ed585b1d3792748267"
+  },
+  "warehouse_unchanged": true,
+  "test_topic_deleted": true,
+  "completed_at_utc": "2026-11-23T13:52:05.481262+00:00"
+}

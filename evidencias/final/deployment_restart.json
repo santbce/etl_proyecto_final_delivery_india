@@ -1,0 +1,22 @@
+{
+  "warehouse_before": {
+    "rows": 18265,
+    "md5": "4c0adacffcb6d1ed585b1d3792748267"
+  },
+  "predictions_before": 150,
+  "warehouse_after": {
+    "rows": 18265,
+    "md5": "4c0adacffcb6d1ed585b1d3792748267"
+  },
+  "predictions_after": 170,
+  "success": true,
+  "services_recreated": true,
+  "postgres_volume_preserved": true,
+  "prediction_store_preserved": true,
+  "topic_recreated_before_consumer": true,
+  "new_events_after_restart": 20,
+  "browser_counter_before": 100,
+  "browser_counter_after_first_replay": 150,
+  "browser_counter_after_restart": 170,
+  "browser_manually_reloaded": false
+}

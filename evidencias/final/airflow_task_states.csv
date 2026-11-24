@@ -1,0 +1,13 @@
+dag_id,run_id,task_id,state,start_date,end_date,duration,try_number
+etl_india_final,manual__2026-11-23T00:00:00+00:00,cargar_data_warehouse,success,,2026-11-23 13:51:07.911409,,1
+etl_india_final,manual__2026-11-23T00:00:00+00:00,eda_tres_fuentes,success,,2026-11-23 13:50:53.076361,,1
+etl_india_final,manual__2026-11-23T00:00:00+00:00,entrenar_modelo,success,,2026-11-23 13:51:12.882270,,1
+etl_india_final,manual__2026-11-23T00:00:00+00:00,extraer_api_clima,success,,2026-11-23 13:50:50.169743,,1
+etl_india_final,manual__2026-11-23T00:00:00+00:00,extraer_dataset_ciudades_bd,success,,2026-11-23 13:49:44.931461,,1
+etl_india_final,manual__2026-11-23T00:00:00+00:00,extraer_primera_entrega_sqlite,success,,2026-11-23 13:49:46.040682,,1
+etl_india_final,manual__2026-11-23T00:00:00+00:00,preparar_ejecucion,success,,2026-11-23 13:49:34.976471,,1
+etl_india_final,manual__2026-11-23T00:00:00+00:00,publicar_kafka,success,,2026-11-23 13:51:25.268751,,1
+etl_india_final,manual__2026-11-23T00:00:00+00:00,reporte_estatico,success,,2026-11-23 13:51:14.619309,,1
+etl_india_final,manual__2026-11-23T00:00:00+00:00,transformar_integrar,success,,2026-11-23 13:50:54.652402,,1
+etl_india_final,manual__2026-11-23T00:00:00+00:00,validar_great_expectations,success,,2026-11-23 13:51:05.788071,,1
+etl_india_final,manual__2026-11-23T00:00:00+00:00,visualizar_desde_warehouse,success,,2026-11-23 13:51:10.951265,,1

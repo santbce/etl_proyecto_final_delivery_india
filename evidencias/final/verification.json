@@ -1,0 +1,60 @@
+{
+  "verified_at_utc": "2026-11-23T14:05:12.635973+00:00",
+  "success": true,
+  "fresh_project": "india-verification",
+  "unit_tests": {
+    "tests": 25,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "airflow_tasks": 12,
+  "audit_checks": 21,
+  "kafka_integration": {
+    "predicted": 20,
+    "duplicate": 20,
+    "rejected": 3
+  },
+  "consumer_recovery": true,
+  "corrupt_artifact_rejected": true,
+  "notebooks": {
+    "notebooks/03_modelo_predictivo.ipynb": {
+      "code_cells": 5,
+      "executed_cells": 5,
+      "errors": 0
+    },
+    "notebooks/04_demo_streaming.ipynb": {
+      "code_cells": 8,
+      "executed_cells": 8,
+      "errors": 0
+    }
+  },
+  "deployment_restart": {
+    "warehouse_before": {
+      "rows": 18265,
+      "md5": "4c0adacffcb6d1ed585b1d3792748267"
+    },
+    "predictions_before": 150,
+    "warehouse_after": {
+      "rows": 18265,
+      "md5": "4c0adacffcb6d1ed585b1d3792748267"
+    },
+    "predictions_after": 170,
+    "success": true,
+    "services_recreated": true,
+    "postgres_volume_preserved": true,
+    "prediction_store_preserved": true,
+    "topic_recreated_before_consumer": true,
+    "new_events_after_restart": 20,
+    "browser_counter_before": 100,
+    "browser_counter_after_first_replay": 150,
+    "browser_counter_after_restart": 170,
+    "browser_manually_reloaded": false
+  },
+  "airflow_restart_after_pid_fix": true,
+  "dump_restore": {
+    "success": true,
+    "rows": 18265
+  },
+  "pip_check": "No broken requirements found."
+}

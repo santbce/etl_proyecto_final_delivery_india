@@ -1,0 +1,62 @@
+{
+  "airflow_health": {
+    "dag_processor": {
+      "latest_dag_processor_heartbeat": null,
+      "status": null
+    },
+    "metadatabase": {
+      "status": "healthy"
+    },
+    "scheduler": {
+      "latest_scheduler_heartbeat": "2026-11-23T13:54:20.783933+00:00",
+      "status": "healthy"
+    },
+    "triggerer": {
+      "latest_triggerer_heartbeat": "2026-11-23T13:54:20.149307+00:00",
+      "status": "healthy"
+    }
+  },
+  "verification_project": "india-verification",
+  "host_ports": {
+    "postgres": 55433,
+    "kafka": 19093,
+    "streamlit": 8503,
+    "airflow": 8089
+  },
+  "airflow_health_after_restart": {
+    "dag_processor": {
+      "latest_dag_processor_heartbeat": null,
+      "status": null
+    },
+    "metadatabase": {
+      "status": "healthy"
+    },
+    "scheduler": {
+      "latest_scheduler_heartbeat": "2026-11-23T14:02:20.735187+00:00",
+      "status": "healthy"
+    },
+    "triggerer": {
+      "latest_triggerer_heartbeat": "2026-11-23T14:02:21.241560+00:00",
+      "status": "healthy"
+    }
+  },
+  "stale_webserver_pid_cleanup": true,
+  "airflow_health_after_fixed_startup_restart": {
+    "dag_processor": {
+      "latest_dag_processor_heartbeat": null,
+      "status": null
+    },
+    "metadatabase": {
+      "status": "healthy"
+    },
+    "scheduler": {
+      "latest_scheduler_heartbeat": "2026-11-23T14:03:45.537936+00:00",
+      "status": "healthy"
+    },
+    "triggerer": {
+      "latest_triggerer_heartbeat": "2026-11-23T14:03:46.152091+00:00",
+      "status": "healthy"
+    }
+  },
+  "fixed_startup_restart_passed": true
+}

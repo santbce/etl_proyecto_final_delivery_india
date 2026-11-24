@@ -1,0 +1,112 @@
+{
+  "success": true,
+  "status": true,
+  "started_at_utc": "2026-11-23T13:51:56.145643+00:00",
+  "topic": "india.recovery.11f7928c70c947549f2d685f6f5f34cf",
+  "group": "india-recovery-11f7928c70c947549f2d685f6f5f34cf",
+  "simulation": true,
+  "consumer_warehouse_credentials_present": false,
+  "warehouse_write_operations": 0,
+  "commands": [
+    "python tests/integration_recovery.py",
+    "python src/final_stream.py consume --max-messages 2 --idle-timeout 15",
+    "python src/final_stream.py consume --max-messages 3 --idle-timeout 15",
+    "python src/final_stream.py consume --artifacts runtime/<mutated-copy>"
+  ],
+  "prediction_store": "runtime/recovery_11f7928c70c947549f2d685f6f5f34cf.sqlite",
+  "logs": {
+    "phase1": "runtime/recovery_11f7928c70c947549f2d685f6f5f34cf_phase1.log",
+    "phase2": "runtime/recovery_11f7928c70c947549f2d685f6f5f34cf_phase2.log",
+    "bad_artifact": "runtime/recovery_11f7928c70c947549f2d685f6f5f34cf_bad_artifact.log"
+  },
+  "warehouse_before": {
+    "rows": 18265,
+    "md5": "4c0adacffcb6d1ed585b1d3792748267"
+  },
+  "phase1": {
+    "counts": {
+      "predicted": 2,
+      "duplicate": 0,
+      "rejected": 0
+    },
+    "committed_offset": 2,
+    "consumer_pid": 40,
+    "exit_code": 0
+  },
+  "phase2": {
+    "counts": {
+      "predicted": 2,
+      "duplicate": 0,
+      "rejected": 1
+    },
+    "committed_offset": 5,
+    "consumer_pid": 75,
+    "exit_code": 0
+  },
+  "restart": {
+    "same_group": true,
+    "same_store": true,
+    "previous_records_unchanged": true,
+    "valid_offsets": [
+      0,
+      1,
+      3,
+      4
+    ],
+    "rejected_offsets": [
+      2
+    ],
+    "total_predictions": 4,
+    "total_rejected": 1
+  },
+  "offline_live_parity": [
+    {
+      "city_name": "Bangalore",
+      "target_date": "2023-01-01",
+      "offline_model": 309.9750895740532,
+      "offline_csv": 309.9750895740532,
+      "consumer_prediction": 309.9750895740532,
+      "event_id": "65a5489b-dddd-579b-9657-6c130b5dbeeb"
+    },
+    {
+      "city_name": "Chennai",
+      "target_date": "2023-01-01",
+      "offline_model": 312.9528090500713,
+      "offline_csv": 312.9528090500713,
+      "consumer_prediction": 312.9528090500713,
+      "event_id": "d8b56115-405c-59eb-9663-c8f4683037e5"
+    },
+    {
+      "city_name": "Delhi",
+      "target_date": "2023-01-01",
+      "offline_model": 314.6635022984164,
+      "offline_csv": 314.6635022984164,
+      "consumer_prediction": 314.6635022984164,
+      "event_id": "b19c6895-2133-5748-bc80-cc3aedcfcff5"
+    },
+    {
+      "city_name": "Kolkata",
+      "target_date": "2023-01-01",
+      "offline_model": 313.33704539137034,
+      "offline_csv": 313.33704539137034,
+      "consumer_prediction": 313.33704539137034,
+      "event_id": "bb4b486a-843a-51eb-b8b8-e4c32bfa2ac8"
+    }
+  ],
+  "artifact_integrity": {
+    "mutated_copy_rejected": true,
+    "exit_code": 1,
+    "no_store_created": true,
+    "original_model_unchanged": true,
+    "original_sha256": "90b6dd4d28661a8919537583676ba6273fc1e3702219709d5387edafda9bf85d",
+    "mutated_copy_sha256": "16501d522eea97d0c3c1d69a8988e27f6434c1e6654f315d7004f1d4b2495ffb"
+  },
+  "warehouse_after": {
+    "rows": 18265,
+    "md5": "4c0adacffcb6d1ed585b1d3792748267"
+  },
+  "warehouse_unchanged": true,
+  "model_version": "90b6dd4d28661a89",
+  "test_topic_deleted": true,
+  "completed_at_utc": "2026-11-23T13:52:10.120714+00:00"
+}
